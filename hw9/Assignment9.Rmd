@@ -1,0 +1,155 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+library(GGally)
+library(alr3)
+library(caret)
+library(class)
+library(MASS)
+library("ggpubr")
+library(boot)
+library(broom)
+```
+\section{Q2.}
+
+
+```{r}
+library(e1071)
+data(crabs)
+head(crabs)
+set.seed(6789)
+inTrain <- createDataPartition(crabs$sp, p = 0.8, list = FALSE)
+training <- crabs[inTrain,]
+testing <- crabs[-inTrain,]
+```
+
+\subsection{a}
+For the linear Svm model
+```{r}
+set.seed(1)
+
+ranges = c(0.001, 0.01, 0.1, 1, 5, 10, 100)
+
+svmTrainErr = vector(length = length(ranges))
+svmTestErr = vector(length = length(ranges))
+
+
+for (i in 1:length(ranges)) {
+svm.model = svm(sp ~ .-index, data = training, kernel = "linear", cost = ranges[i], scale = FALSE)
+pred.train <- predict(svm.model, training)
+pred.test<-predict(svm.model,testing)
+svmTrainErr[i] = mean(pred.train != training$sp)
+svmTestErr[i] = mean(pred.test != testing$sp)
+}
+
+tune.out <- tune(svm,  sp~ .-index, data = training, kernel = "linear",
+ranges = list(cost = c(0.001, 0.01, 0.1, 1, 5, 10, 100)))
+summary(tune.out)
+
+tune.out$best.model
+svmTestErr
+svmTrainErr
+```
+We take the lograithm of the cost to make plots for better visualization
+```{r}
+plot(log(tune.out$performances$cost),tune.out$performances$error,main = "Cross-validation error vs. cost", xlab = "log(cost)",ylab = "Error" )
+plot(log(ranges),svmTrainErr,main = "Train error vs. cost", xlab = "log(cost)",ylab = "Error" )
+plot(log(ranges),svmTestErr,main = "Test error vs. cost", xlab = "log(cost)",ylab = "Error" )
+```
+The best model is obtained by $cost \geq 1$, Since the cv-error, train error and test error are all minimized.
+
+
+\subsection{b}
+For the non-linear Svm model
+```{r}
+ranges =  c(0.1, 1, 10, 100, 1000)
+
+set.seed(1)
+tune.out <- tune(svm,sp ~ .-index, data = training, kernel = "radial",
+ranges = list(cost = c(0.1, 1, 10, 100, 1000),
+gamma = c(0.5, 1, 2, 3, 4),degree = c(1,2,3,4,5)))
+summary(tune.out)
+
+```
+We first pick the  value of gamma
+```{r}
+
+with(tune.out$performances, {
+plot(error[gamma == 0.5] ~ cost[gamma == 0.5], ylim = c(.1, .35),
+type = "o", col = rainbow(5)[1], ylab = "CV error", xlab = "cost")
+lines(error[gamma == 1] ~ cost[gamma == 1],
+type = "o", col = rainbow(5)[2])
+lines(error[gamma == 2] ~ cost[gamma == 2],
+type = "o", col = rainbow(5)[3])
+lines(error[gamma == 3] ~ cost[gamma == 3],
+type = "o", col = rainbow(5)[4])
+lines(error[gamma == 4] ~ cost[gamma == 4],
+type = "o", col = rainbow(5)[5])
+})
+legend("bottom", horiz = T, legend = c(0.5, 1:4), col = rainbow(5),
+lty = 1, cex = .75, title = "gamma")
+```
+Hence the best choice of gamma is 0.5.
+Then we pick the value of degree
+```{r}
+
+with(tune.out$performances, {
+plot(error[degree == 5] ~ cost[degree == 5], ylim = c(.1, .35),
+type = "o", col = rainbow(5)[1], ylab = "CV error", xlab = "cost")
+lines(error[degree == 1] ~ cost[degree == 1],
+type = "o", col = rainbow(5)[2])
+lines(error[degree == 2] ~ cost[degree == 2],
+type = "o", col = rainbow(5)[3])
+lines(error[degree == 3] ~ cost[degree == 3],
+type = "o", col = rainbow(5)[4])
+lines(error[degree == 4] ~ cost[degree == 4],
+type = "o", col = rainbow(5)[5])
+})
+legend("bottom", horiz = T, legend = c(1:5), col = rainbow(5),
+lty = 1, cex = .75, title = "degree")
+
+```
+Hence the best choice of degree is 1.
+```{r}
+bestmod <- tune.out$best.model
+summary(bestmod)
+```
+
+We take the lograithm of the cost to make plots for better visualization
+```{r}
+ranges =  c(0.1, 1, 10, 100, 1000)
+
+svmTrainErr = vector(length = length(ranges))
+svmTestErr = vector(length = length(ranges))
+
+
+for (i in 1:length(ranges)) {
+svm.model = svm(sp ~ .-index, data = training, kernel = "radial", cost = ranges[i],degree = 1, gamma = 0.5, scale = FALSE)
+pred.train <- predict(svm.model, training)
+pred.test<-predict(svm.model,testing)
+svmTrainErr[i] = mean(pred.train != training$sp)
+svmTestErr[i] = mean(pred.test != testing$sp)
+}
+
+
+selected <-tune.out$performances$gamma == 0.5 & tune.out$performances$degree == 1
+plot(log(ranges),subset(tune.out$performances,selected)$error,main = "Cross-validation error vs. cost", xlab = "log(cost)",ylab = "Error")
+plot(log(ranges),svmTrainErr,main = "Train error vs. cost", xlab = "log(cost)",ylab = "Error" )
+plot(log(ranges),svmTestErr,main = "Test error vs. cost", xlab = "log(cost)",ylab = "Error" )
+```
+The best model is obtained by $cost \geq 10$, Since the cv-error, train error and test error are all minimized.
+
+The best model is obtained by $cost \geq 1$, Since the cv-error, train error and test error are all minimized.
+
+

@@ -1,0 +1,128 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+library(GGally)
+library(alr3)
+library(caret)
+library(class)
+library(MASS)
+library("ggpubr")
+library(boot)
+library(broom)
+```
+\section{Q2.}
+
+
+```{r}
+data(crabs)
+head(crabs)
+set.seed(6789)
+inTrain <- createDataPartition(crabs$sp, p = 0.8, list = FALSE)
+training <- crabs[inTrain,]
+testing <- crabs[-inTrain,]
+```
+__(a)__
+```{r}
+library(tree)
+set.seed(10)
+tree.crabs=tree(sp~. -index, training)
+cv.crabs=cv.tree(tree.crabs,FUN=prune.misclass)
+names(cv.crabs)
+cv.crabs
+par(mfrow=c(1,2))
+plot(cv.crabs$size,cv.crabs$dev / length(train),ylab="cv error", xlab="size",type="b")
+plot(cv.crabs$k, cv.crabs$dev / length(train),ylab="cv error", xlab="k",type="b")
+```
+Hence, the lowest test error is obtained when size = 10
+
+#plot
+```{r}
+prune.crabs=prune.misclass(tree.crabs,best=10)
+plot(prune.crabs)
+text(prune.crabs,pretty=0)
+```
+
+```{r}
+#test error
+tree.pred=predict(prune.crabs,testing,type="class")
+table(tree.pred,testing$sp)
+(test.err<-(3+2)/40) #test error
+```
+
+```{r}
+#train error
+tree.pred_train=predict(prune.crabs,training,type="class")
+table(tree.pred_train,training$sp)
+(train.err<-(2+2)/160) #train error
+```
+__(b)__
+```{r}
+library(randomForest)
+rf.crabs=randomForest(sp~.-index,data=crabs,subset=inTrain,mtry = 5,importance=TRUE)
+```
+
+```{r}
+#importance plot
+varImpPlot(rf.crabs)
+```
+The two most important variables are FL and BD, however, the result of single tree shows
+that FL and CW are the two most important variables, which indicates a difference.
+```{r}
+#train error
+rf.train_pred = predict(rf.crabs, training)
+table(rf.train_pred,training$sp)
+(train.err<-(0+0)/160) #train error
+```
+```{r}
+#test error
+rf.test_pred = predict(rf.crabs, testing)
+table(rf.test_pred,testing$sp)
+(test.err<-(5+2)/40) #test error
+```
+
+
+
+__(C)__
+```{r}
+library(gbm)
+library(adabag)
+crabs$sp01 = ifelse(crabs$sp=="B", 1, 0)
+set.seed(6789)
+inTrain <- createDataPartition(crabs$sp01, p = 0.8, list = FALSE)
+training <- crabs[inTrain,]
+testing <- crabs[-inTrain,]
+
+#crabs.boostcv<-boosting.cv(sp~.-index-sp01,data = training, v = 5, mfinal = 1000) 
+#The cross-validation step is too slow, so this step is skipped in the result
+
+adaboost.fit = gbm(sp01~.-index-sp, data = training , distribution="adaboost", n.trees=1000)
+```
+
+```{r}
+#train error
+probs.adaboost = predict(adaboost.fit, training, n.trees = 1000, type = 'response')
+pred.adaboost = ifelse(probs.adaboost > 0.5, 1, 0)
+train_err = mean(pred.adaboost!=training$sp01)
+print(train_err)
+```
+```{r}
+#test error
+probs.adaboost = predict(adaboost.fit, testing, n.trees = 1000, type = 'response')
+pred.adaboost = ifelse(probs.adaboost > 0.5, 1, 0)
+test_err = mean(pred.adaboost!=testing$sp01)
+print(test_err)
+```
+__(d)__
+The results of Adaboost reports the second lowest train error and lowest test error. Hence, for this dataset, we should choose
+adaboost as our method. The results are non-consistent across methods.

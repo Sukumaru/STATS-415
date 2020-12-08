@@ -1,0 +1,120 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+library(GGally)
+library(alr3)
+library(caret)
+library(class)
+```
+
+## Q3.
+
+__(a)__
+
+```{r}
+library(ISLR)
+data("Carseats")
+inTrain <- createDataPartition(Carseats$Sales, p = 0.75, list = FALSE)
+training <- Carseats[inTrain,]
+testing <- Carseats[-inTrain,]
+
+model1 <- lm(Sales ~ ., data = training)
+summary(model1)
+pred1 <- predict(model1, testing)
+Result1 <- postResample(pred1, testing$Sales)
+head(Result1)
+##     RMSE  Rsquared       MAE 
+##1.1487637 0.8415894 0.9375886 
+
+model2 <- lm(Sales ~ CompPrice+Income+Advertising+Price+ShelveLoc, data = training)
+summary(model2)
+pred2 <- predict(model2, testing)
+Result2 <- postResample(pred2, testing$Sales)
+head(Result2)
+
+##     RMSE  Rsquared       MAE 
+##1.3994254 0.7627533 1.1437243 
+
+```
+
+The error of the second model is no better than the first model, though the 
+second model abolished all the non-significant variables. It is mainly beacuse
+ the fact that "non-significant" is not equivalent to "no-impact". If the 
+coefficient is not equal to zero, but we failed to reject the mistake of our
+null-hypothesis, then it would cause a type-II error.
+
+__(b)__
+The training error will be lower when k = 1, however the testing error will be 
+lower when k = 20. 
+When k = 1, the closest training sample will be chosen to the test sample
+(which is itself). Hence, the training error of k = 1 is zero(unbiased).
+However the test error is maximumed since the model is the most noisy.
+
+When K=20, we choose around a test sample based on that its category and the 
+category of 19 of its closest neighbors, which makes the test error smaller, 
+but the bias will increase and also increase the training error.
+
+```{r}
+knn_training <- training[,c(1,2,3,4,6)]
+knn_testing <- testing[,c(1,2,3,4,6)]
+train_category <- knn_training[,1]
+test_category <- knn_testing[,1]
+
+pred3 <- knn(knn_training,knn_testing,cl=train_category,k=1,prob= "True")
+pred4  <- knn(knn_training,knn_testing,cl=train_category,k=20,prob= "True")
+```
+
+__(c)__
+I would standardize variables in the data set first. Standardization removes 
+scale effects caused by use of features with different measurement scales.
+Once standardization is performed on a set of features, mthe range and scale of 
+the z-scores should be similar, providing the distributions of raw feature
+values are alike.
+
+For example, if we want to use a knn model to predict a person's weight based on 
+his height and average calories taken a day. The first variable is in the range among
+[150,200], however the second variable is in the range of [1000,3000].Then second 
+variable will have a much greater influence on the distance between samples and
+may bias the performance of the classifier.
+
+__(d)__
+
+```{r}
+train.RMSE = rep(0,20) ##Derive the error by calculating the RMSE of the regression
+test.RMSE = rep(0,20)
+
+ for(k in 1 : 20){
+fit <- knnreg(knn_training,train_category,k=k)
+train.RMSE[k] <- sqrt(sum(abs(predict(fit,knn_training)-train_category)^2)/length(train_category))
+test.RMSE[k] <- sqrt(sum(abs(predict(fit,knn_testing)-test_category)^2)/length(test_category))
+}
+ 
+plot(1:20, train.RMSE, xlab = "k", ylab = "RMSE",col='red', type = 'b', ylim = c(0,4))+points(1:20, test.RMSE, col='blue', type = 'b')
+
+```
+Hence, from the result graph, we can see that both train error is
+minimized when k = 1, and test error is minimized when k = 3.
+__(e)__
+We choose k = 3
+```{r}
+test.residual = rep(0,99)
+fit <- knnreg(knn_training,train_category,k=3)
+test.residual<- predict(fit,knn_testing)-test_category
+model2.res = pred2-test_category
+
+plot(test_category,model2.res,xlab = "sales", ylab = "Residual",col='red', ylim = c(-4,4))+points(test_category,test.residual,col='blue') 
+##The residual of linear regression is red and the residual of knn regression is blue
+```
+We can observe that the residual is independent of sales, and the residual of 
+linear regression have less variance than the the residual of knn regression.

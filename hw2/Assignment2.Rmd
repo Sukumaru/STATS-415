@@ -1,0 +1,88 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+library(GGally)
+library(alr3)
+```
+
+## 2 Q2.
+
+__(a)__
+
+```{r}
+library(ISLR)
+data("Carseats")
+fit <- lm(Sales ~ CompPrice+Income+Advertising+Population+Price+ShelveLoc+Age+Education+Urban+US, data = Carseats)
+summary(fit)
+##The multiple R-squared value is 0.8698, which shows that this regression 
+##can interpret 87% of the changes of the dependent variable.
+residualPlot(fit)           #Diagnostic residual plots
+qqPlot(fit, main="QQ Plot") #qq plot for studentized residuals
+##There is no clear interaction between the predicted value and residuals
+```
+
+
+__(b)__
+
+```{r}
+##We can see that CompPrice, Income, Advertising, Price,
+##and ShelveLoc have significant p-values.
+
+##For the variable "Urban", we have the P-value = 0.277 > 0.05, hence, we
+##rejected the hypothesis that the variable Urban is significant.
+```
+__(c)__
+
+```{r}
+fit1 <- lm(Sales ~ CompPrice+Income+Advertising+Price+ShelveLoc, data = Carseats)
+summary(fit1)
+##The multiple R-squared value is 0.8001, which shows that this regression can 
+##interpret 80% of the changes of the dependent variable
+
+##The R-squared value  of the reduced model slightly decreased from the previous
+##value with the full model.
+```
+__(d)__
+
+```{r}
+anova(fit,fit1)
+#The P-value is significant, i.e. we can not reject the hypothesis that the two 
+# models have different variance. 
+
+#Hence, the different between the R-squared value is not significant, and the 
+#second model is better.
+```
+
+__(e)__
+
+y = 2.431 + 0.096 x  CompPrice + 0.016 x  Income + 0.116 x  Advertising - 0.093 x Price + 4.798 (If shelveLoc = Good) + 1.850 (If ShelveLoc = Medium)
+
+__(f)__
+
+```{r}
+fit2 <- lm(Sales ~ CompPrice+Income+Advertising+Price+ShelveLoc + Price:ShelveLoc, data = Carseats)
+summary(fit2)
+##We can see that the interaction between Price and ShelveLoc have 
+##non-significant p-values, hence the interaction term is not necessary.
+```
+__(d)__
+
+```{r}
+anova(fit1,fit2)
+#The P-value is not significant, i.e. we canreject the hypothesis that the two 
+# models have different variance. 
+
+#Hence, the different between the R-squared value is significant, and the 
+#interaction term is not necessary.
+```

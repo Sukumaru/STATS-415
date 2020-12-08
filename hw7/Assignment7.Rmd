@@ -1,0 +1,83 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+library(GGally)
+library(alr3)
+library(caret)
+library(class)
+library(MASS)
+library("ggpubr")
+library(boot)
+library(broom)
+```
+\section{Q2.}
+
+
+```{r}
+library(ISLR)
+data("College")
+College$Accept.Apps<-College$Accept/College$Apps
+College<-College[,c(-2,-3)]
+#Split the dataset
+set.seed(234)
+inTrain <- createDataPartition(College$Accept.Apps, p = 0.7, list = FALSE)
+training <- College[inTrain,]
+testing <- College[-inTrain,]
+```
+__(a)__
+```{r}
+X <- model.matrix(Accept.Apps ~ ., data = College)[, -1]
+# Run PCA
+collegePCA <- prcomp(x = X, center = T, scale = T)
+```
+We Choose to standardize our data, Since the scales of different variables vary a lot. 
+```{r}
+collegePCA
+#Scree Plot
+plot(collegePCA)
+```
+We need 14 eigenvalues for us to explain 95% of the variances in the data.
+```{r}
+#loadings fo the first and second PCs
+collegePCA$rotation[,1]
+collegePCA$rotation[,2]
+```
+The first component is proportional to each variable, and the second component measures the difference between the first pair of variables and the second pair of variables.
+
+__(b)__
+```{r}
+library(pls)
+collegePCR <- pcr(Accept.Apps ~ ., data = training, scale = TRUE, validation = "CV")
+summary(collegePCR)
+
+validationplot(collegePCR, val.type = "MSEP", legendpos = "topright")
+```
+Hence the value m is chosen with 14
+```{r}
+collegePCR.pred <- predict(collegePCR, College[-inTrain, names(College) != 'Salary'], ncomp = 14)
+PCRTestMSE <- mean((collegePCR.pred - College[-inTrain, "Accept.Apps"])^2)
+PCRTestMSE #test error obtained
+```
+__(C)__
+```{r}
+PCRTestMSE
+#                 TestMSE     TrainMSE
+#Best reduced OLS	0.01441521	0.01315906		
+#Ridge Regression	0.01432566	0.01334943		
+#Lasso	          0.01554418	0.01405796	
+
+```
+The PC regression performs the lowest testMSE for this dataset. Although it requires
+a lot of calculation, the differences of the testMSEs are significant. So PCR should be chosen as
+the approach to analyze this dataset.

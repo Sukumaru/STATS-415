@@ -1,0 +1,79 @@
+---
+title: "Hw1"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r HW1}
+
+DATADIR <- "./extdata"
+
+college_file_path <- file.path(DATADIR,"College.csv")
+college_dt <-as.data.frame(read.csv(college_file_path))
+head(college_dt)
+summary (college_dt)
+
+#Change the Private Type into Factor
+college_dt$Private <- as.factor(college_dt$Private)
+summary (college_dt)
+
+
+#Study the correlation
+col<-c("Private","Apps","Accept","Enroll","Top10perc","Top25perc","F.Undergrad","P.Undergrad","Outstate","Room.Board","Books","Personal","PhD","Terminal","S.F.Ratio","perc.alumni","Expend","Grad.Rate")
+
+cor(college_dt[,c("Apps","Accept","Enroll","Top10perc","Top25perc","F.Undergrad","P.Undergrad","Outstate","Room.Board","Books","Personal","PhD","Terminal","S.F.Ratio","perc.alumni","Expend","Grad.Rate")])
+
+corrplot(cor(college_dt[,c("Apps","Accept","Enroll","Top10perc","Top25perc","F.Undergrad","P.Undergrad","Outstate","Room.Board","Books","Personal","PhD","Terminal","S.F.Ratio","perc.alumni","Expend","Grad.Rate")]), method="color", type = "upper", col=brewer.pal(n=10, name="RdBu"), 
+         tl.col="black",tl.srt=90, addCoef.col = "gray8", diag = T, number.cex = 0.65)
+
+top25perc<-college_dt[,7]
+hist(top25perc)
+boxplot(top25perc)
+
+ks.test(top25perc, "pnorm", mean = mean(top25perc), sd =  sqrt(var(top25perc)))
+
+
+##correlation plot of top10perc and Expenditure
+perc_and_Expend<-college_dt[,c(6,18)]
+ggplot(college_dt, aes(Top10perc, Expend))+ geom_point(colour = "black", shape = 21, size = 3, aes(fill = factor(Private)))+ 
+  scale_fill_brewer(palette = "OrRd")+
+  geom_smooth(method = "loess", col = "dodgerblue4", fill = "lightsteelblue3", size = 1.2)+
+  annotate("text", x = 0.8, y = 0.52, label = "italic(r) == 0.42", parse = T, size = 6, col = "gray20")+
+  labs(x = "top10perc", y = "Expenditure")+
+  theme_economist()+
+  theme(axis.text.x = element_text(size=10), axis.text.y = element_text(size=10), legend.position = "right")+
+  guides(fill = guide_legend(title = "Private or not"))
+
+
+college_dt$accept_rate<-college_dt[,4]/college_dt[,3]
+college_dt$enroll_rate<-college_dt[,5]/college_dt[,3]
+boxplot(college_dt[,c(20,21)])
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

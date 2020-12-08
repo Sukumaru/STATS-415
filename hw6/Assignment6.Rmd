@@ -1,0 +1,297 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+library(GGally)
+library(alr3)
+library(caret)
+library(class)
+library(MASS)
+library("ggpubr")
+library(boot)
+library(broom)
+```
+\section{Q3.}
+
+__(a)__
+```{r}
+library(ISLR)
+data("College")
+College$Accept.Apps<-College$Accept/College$Apps
+College<-College[,c(-2,-3)]
+
+#Scatterplot for variables except for private, private shown as color
+College %>%
+  gather(-Accept.Apps, -Private,  key = "var", value = "value") %>% 
+  ggplot(aes(x = value, y = Accept.Apps, color = Private)) +
+    geom_point() +
+    facet_wrap(~ var, scales = "free") +
+    theme_bw()
+
+#Split the dataset
+set.seed(234)
+inTrain <- createDataPartition(College$Accept.Apps, p = 0.7, list = FALSE)
+training <- College[inTrain,]
+testing <- College[-inTrain,]
+```
+__(b)__
+Fit a linear model using least squares on the training set, and
+report the training and test error obtained, with Accept/Apps as
+the response variable and all the other variables except Accept
+and Apps as predictors.
+
+For testing error
+```{r}
+linear_model <- lm(Accept.Apps~. ,data=training)
+testPrediction <- predict(linear_model, testing)
+test_MSE<-mean((testPrediction - testing$Accept.Apps)^2)
+test_MSE
+##Hence, the testing error is 0.01350159
+```
+For training error
+```{r}
+trainPrediction <- predict(linear_model, training)
+train_MSE<-mean((trainPrediction - training$Accept.Apps)^2)
+train_MSE
+##Hence, the testing error is 0.01422197
+```
+__(c)__
+```{r}
+library(leaps)
+regfit.full = regsubsets(Accept.Apps~. , data = College, nvmax=ncol(College)-1)
+regfit.Summary = summary(regfit.full)
+names(regfit.Summary)
+regfit.Summary$rsq
+```
+
+#Adjusted R-square
+```{r}
+best_adjr2 = which.max(regfit.Summary$adjr2)
+best_adjr2 #11
+# We can use the coef() function to see which predictors made the cut
+coef(regfit.full, 11)
+
+```
+For testing error
+```{r}
+linear_model1 <- lm(Accept.Apps ~ Private+Enroll+Top10perc+P.Undergrad+Outstate+Room.Board+ Books   +S.F.Ratio+perc.alumni+Expend+Grad.Rate ,data=training)
+
+testPrediction1 <- predict(linear_model1, testing)
+test_MSE1<-mean((testPrediction1 - testing$Accept.Apps)^2)
+test_MSE1
+##Hence, the testing error is 0.01327613
+```
+For training error
+```{r}
+trainPrediction1 <- predict(linear_model1, training)
+train_MSE1<-mean((trainPrediction1 - training$Accept.Apps)^2)
+train_MSE1
+##Hence, the testing error is 0.01433002
+
+```
+# AIC
+```{r}
+best_cp = which.min(regfit.Summary$cp)
+best_cp #11
+coef(regfit.full, 11)
+```
+For testing error
+```{r}
+linear_model2 <- lm(Accept.Apps ~ Private+Enroll+Top10perc+P.Undergrad+Outstate+Room.Board+ Books   +S.F.Ratio+perc.alumni+Expend+Grad.Rate ,data=training)
+
+testPrediction2 <- predict(linear_model2, testing)
+test_MSE2<-mean((testPrediction2 - testing$Accept.Apps)^2)
+test_MSE2
+##Hence, the testing error is 0.01327613
+```
+For training error
+```{r}
+trainPrediction2 <- predict(linear_model2, training)
+train_MSE2<-mean((trainPrediction2 - training$Accept.Apps)^2)
+train_MSE2
+##Hence, the testing error is 0.01433002
+
+```
+# BIC
+```{r}
+best_bic = which.min(regfit.Summary$bic)
+best_bic
+best_bic #10
+coef(regfit.full, 10)
+```
+For testing error
+```{r}
+linear_model3 <- lm(Accept.Apps ~ Private+Enroll+Top10perc+P.Undergrad+Outstate+Room.Board+ Books   +S.F.Ratio+Expend+Grad.Rate ,data=training)
+
+testPrediction3 <- predict(linear_model3, testing)
+test_MSE3<-mean((testPrediction3 - testing$Accept.Apps)^2)
+test_MSE3
+##Hence, the testing error is 0.01315906
+```
+For training error
+```{r}
+trainPrediction3 <- predict(linear_model3, training)
+train_MSE3<-mean((trainPrediction3 - training$Accept.Apps)^2)
+train_MSE3
+##Hence, the testing error is  0.01441521
+
+```
+__(d)__
+#Candidate model in (c)
+The model with smaller test error is the model founded by BIC with 10 variables included.
+```{r}
+y_train <- training$Accept.Apps
+y_test <- testing$Accept.Apps
+
+one_hot_encoding <- dummyVars(Accept.Apps ~ Private+Enroll+Top10perc+P.Undergrad+Outstate+Room.Board+ Books+S.F.Ratio+Expend+Grad.Rate, data = training)
+x_train <- predict(one_hot_encoding, training)
+x_test <- predict(one_hot_encoding, testing)
+
+
+linear_fit <- train(x = x_train, y = y_train,
+                   method = 'lm', 
+                   trControl = trainControl(method = 'cv', number = 5),
+                  )
+
+
+(linear_info_test <- postResample(predict(linear_fit, x_test), y_test))
+
+test_MSE4<-linear_info_test[1]^2
+test_MSE4 #0.01315906 
+
+(linear_info_train <- postResample(predict(linear_fit, x_train), y_train))
+train_MSE4<-linear_info_train[1]^2
+train_MSE4 #0.01441521
+
+
+college.glm <- glm(Accept.Apps ~ Private+Enroll+Top10perc+P.Undergrad+Outstate+Room.Board+ Books+S.F.Ratio+Expend+Grad.Rate, data = College)
+cv.err = cv.glm(College ,college.glm , K = 5)$delta
+cv.err
+```
+Hence, the test error and train error obtained from cross validation is the same as the 
+value we calculated in (c).
+
+#Full_model in (b)
+```{r}
+y_train <- training$Accept.Apps
+y_test <- testing$Accept.Apps
+
+one_hot_encoding <- dummyVars(Accept.Apps ~. , data = training)
+x_train <- predict(one_hot_encoding, training)
+x_test <- predict(one_hot_encoding, testing)
+
+
+linear_fit <- train(x = x_train, y = y_train,
+                   method = 'lm', 
+                   trControl = trainControl(method = 'cv', number = 5),
+                  )
+
+
+(linear_info_test <- postResample(predict(linear_fit, x_test), y_test))
+
+test_MSE5<-linear_info_test[1]^2
+test_MSE5 #0.01350159 
+
+(linear_info_train <- postResample(predict(linear_fit, x_train), y_train))
+train_MSE5<-linear_info_train[1]^2
+train_MSE5 #0.01422197 
+
+
+college.glm <- glm(Accept.Apps ~., data = College)
+cv.err = cv.glm(College ,college.glm , K = 5)$delta
+cv.err
+```
+Hence, the test error and train error obtained from cross validation is the same as the 
+value we calculated in (b).
+__(e)__
+
+```{r}
+library(glmnet)
+set.seed(1)
+grid = 10^seq(10, -2, length=100)
+ridge.mod = glmnet(x_train, y_train, alpha=0, lambda=grid)
+
+cv.out = cv.glmnet(x_train, y_train, alpha=0, lambda = grid)
+
+bestlam = cv.out$lambda.min
+bestlam
+
+# training MSE
+ridge.pred_train = predict(ridge.mod, s=bestlam, newx=x_train)
+train_MSE_ridge<-mean((ridge.pred_train-y_train)^2)
+train_MSE_ridge
+# test MSE
+ridge.pred_test = predict(ridge.mod, s=bestlam, newx=x_test)
+test_MSE_ridge<-mean((ridge.pred_test-y_test)^2)
+test_MSE_ridge
+#cross_validation error
+cv.out = cv.glmnet(x_train, y_train, alpha=0, lambda = grid, nfolds = 10)
+lambda.grid = cv.out$lambda # grid of lambdas used by cv.glmnet()
+mses = cv.out$cvm # mean crossvalidated error (MSE) for each lambda (averaged over the 10 folds)
+cv_error = mses[which(lambda.grid == bestlam)] # this is the crossvalidated error (MSE)
+print(cv_error)
+```
+__(f)__
+```{r}
+lasso.mod = glmnet(x_train, y_train, alpha=1, lambda=grid)
+set.seed(1)
+cv.out = cv.glmnet(x_train, y_train, alpha=1)
+# best lambda
+bestlam = cv.out$lambda.min
+bestlam
+
+# training error
+lasso.pred_train = predict(lasso.mod,s=bestlam,newx=x_train)
+train_MSE_lasso<-mean((lasso.pred_train-y_train)^2)
+train_MSE_lasso
+# test error
+lasso.pred_test = predict(lasso.mod,s=bestlam,newx=x_test)
+test_MSE_lasso<-mean((lasso.pred_test-y_test)^2)
+test_MSE_lasso
+
+cv.out = cv.glmnet(x_train, y_train, alpha=1, lambda = grid, nfolds = 10)
+lambda.grid = cv.out$lambda =
+mses = cv.out$cvm =
+cv_error = mses[which(lambda.grid == bestlam)] 
+print(cv_error)
+```
+__(g)__
+```{r}
+train_MSE_best_reduced<-train_MSE3
+test_MSE_best_reduced<-test_MSE3
+
+
+models = c("Best reduced OLS", "Ridge Regression", "Lasso")
+train_err = c(
+train_MSE_best_reduced,
+train_MSE_ridge,
+train_MSE_lasso)
+
+test_err = c(
+test_MSE_best_reduced,
+test_MSE_ridge,
+test_MSE_lasso
+)
+results = data.frame(
+models,
+train_err,
+test_err
+)
+colnames(results) = c("Model", "Train MSE", "Test MSE")
+print(results)
+
+```
+In all, we can predict the acceptance rate with approximately 0.0135 testing MSE.
+The testing MSE with ridge regression is the lowest, best reduced OLS model is the second lowest
+and the Lasso regression is the highest. In this dataset, I would choose ridge regression, since it
+reports the lowest training and test error.

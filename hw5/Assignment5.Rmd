@@ -1,0 +1,136 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggthemes)
+library(corrplot)
+library(RColorBrewer)
+library(tidyverse)
+library(GGally)
+library(alr3)
+library(caret)
+library(class)
+library(MASS)
+library("ggpubr")
+```
+\section{Q2.}
+
+__(a)__
+
+```{r}
+library(ISLR)
+data("Auto")
+mpg01 <- ifelse(Auto$mpg > 25, 1, 0)
+Auto <- data.frame(Auto, mpg01)
+set.seed(123)
+num_train <- nrow(Auto) * 0.8
+inTrain <- sample(nrow(Auto), size = num_train)
+training <- Auto[inTrain,]
+testing <- Auto[-inTrain,]
+logistic_model <- glm(mpg01 ~ displacement + horsepower + weight + cylinders, data = training, family = binomial) ## family = binomail is critical!!!!!!!!
+summary(logistic_model)
+```
+Hence, only "weight" and "cylinders" are significant in the logistic regression.
+__(b)__
+For testing error
+```{r}
+pred_test <- predict(logistic_model, testing)
+testPrediction = rep("0", nrow(testing))
+testPrediction[binomial()$linkinv(pred_test) > .5] = "1"
+testing$logistic_mpg = testPrediction
+table(testPrediction, testing$mpg01, dnn = c("Predicted", "Actual"))
+round(mean(testPrediction != testing$mpg01), 2)
+##Hence, the testing error is 0.2
+ggplot(testing, aes(x=displacement, y=weight, color = as.factor(mpg01),shape = as.factor(logistic_mpg)))+geom_point()+labs(title = "True values vs. Predicted Values of Mpg01 with Logistic")
+```
+For training error
+
+```{r}
+pred_train <- predict(logistic_model, training)
+trainPrediction = rep("0", nrow(training))
+trainPrediction[binomial()$linkinv(pred_train)> .5] = "1"
+training$logistic_mpg = trainPrediction
+table(trainPrediction, training$mpg01, dnn = c("Predicted", "Actual"))
+round(mean(trainPrediction != training$mpg01), 2)
+##Hence, the training error is 0.14
+ggplot(training, aes(x=displacement, y=weight, color = as.factor(mpg01),shape = as.factor(logistic_mpg)))+geom_point()+labs(title = "True values vs. Predicted Values of Mpg01 with Logistic")
+```
+__(c)__
+\begin{equation}
+\log\frac{p}{1-p}=1.748 + 9.839\times 10^{-4}displacement-1.213\times 10^{-3}horsepower-3.276\times 10^{-4}weight -7.823\times 10^{-2}cylinders
+\end{equation}
+```{r}
+median(training$displacement)
+median(training$horsepower)
+median(training$weight)
+median(training$cylinders)
+```
+Hence $odds =  0.408$, $p = 0.6$
+__(d)__
+```{r}
+trainX = as.matrix(training[c("displacement", "horsepower","weight","cylinders")])
+testX = as.matrix(testing[c("displacement", "horsepower","weight","cylinders")])
+set.seed(1)
+kvals = seq(1, 300, 10)
+```
+testing error
+```{r}
+knnTestErr = vector(length = length(kvals))
+for (i in 1:length(kvals)) {
+knn.pred = knn(train = trainX, test = testX, cl = training$mpg01, k=kvals[i])
+knnTestErr[i] = mean(knn.pred != testing$mpg01)
+}
+plot(knnTestErr ~ kvals, type = "b")
+knnTestErr ##The minimum value is obtained when k = 71
+```
+training error
+```{r}
+kvals = seq(1, 300, 10)
+knnTrainErr = vector(length = length(kvals))
+for (i in 1:length(kvals)) {
+knn.pred1 = knn(train = trainX, test = trainX, cl = training$mpg01, k=kvals[i])
+knnTrainErr[i] = mean(knn.pred1 != training$mpg01)
+}
+plot(knnTrainErr ~ kvals, type = "b")
+knnTrainErr  ##The minimum value is obtained when k = 1
+##except for k = 1m the minimum value is obtained when k = 21
+```
+__(e)__
+
+```{r}
+knn.pred = knn(train = trainX, test = testX, cl = training$mpg01, k=71)
+testing$knn_mpg = knn.pred
+ggplot(testing, aes(x=displacement, y=weight, color = as.factor(mpg01),shape = as.factor(knn_mpg)))+geom_point()+labs(title = "True values vs. Predicted Values of Mpg01 with Knn")
+
+
+knn.pred1 = knn(train = trainX, test = trainX, cl = training$mpg01, k=21)
+training$knn_mpg = knn.pred1
+ggplot(training, aes(x=displacement, y=weight, color = as.factor(mpg01),shape = as.factor(knn_mpg)))+geom_point()+labs(title = "True values vs. Predicted Values of Mpg01 with Knn")
+```
+__(f)__
+```{r}
+table(knn.pred, testing$mpg01, dnn = c("Predicted", "Actual"))
+round(mean(knn.pred != testing$mpg01), 2)
+##Hence, the testing error is 0.19
+
+table(knn.pred1, training$mpg01, dnn = c("Predicted", "Actual"))
+round(mean(knn.pred1 != training$mpg01), 2)
+##Hence, the training error is 0.13
+```
+In this experiment, we choose k-value with a non-efficient for loop, which is similar to
+bubbling selection, the efficiency of this algorithm is $O(n)$, which is super slow and
+might cause extremely long estimation time. However, if we have determined the range of 
+k-value, we can use a more efficient algorithm to cut off the time into $Olog(n)$. 
+
+Also, normalization is also very important in Knn classification, if we ignored the normalization
+part it might jeopardize the estimation.
+
+
+__(g)__
+Regarding the test error, QDA performs the best, and about the training error both QDA and Knn classification performs the best. Hence the the distribution of the data is non-linear, and the boundary between classes is quadratic.
